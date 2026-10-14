@@ -20,13 +20,11 @@ A [Terraform module][module] to manage a collection of Primary IPs in [Hetzner C
 ## ✨ TL;DR
 
 ```hcl
-module "ips" {
+module "primary_ips" {
   source = "terraform-hetzner-modules/primary-ip/hetzner"
 
-  labels = { managed_by = "terraform" }
   ips = {
-    public_v4 = { type = "ipv4", location = "fsn1" }
-    public_v6 = { type = "ipv6", location = "fsn1", name = "web-v6" }
+    web = { type = "ipv4", location = "fsn1" }
   }
 }
 ```
