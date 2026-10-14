@@ -1,59 +1,46 @@
-# Upgrade guide
+# Maintenance and upgrade guide
 
-Before the first release, replace this template guidance with the module's actual
-engine/provider requirements, compatibility decisions, and migration instructions.
-The starting test matrix covers Terraform 1.7.5/1.16.6 and OpenTofu 1.8.8/1.13.1.
-These are module compatibility targets; confirm that the selected providers support them.
+This module starts with Terraform >= 1.7 and `hetznercloud/hcloud ~> 1.70`.
+The test matrix covers Terraform 1.7.5/1.16.6 and OpenTofu 1.8.8/1.13.1.
+These are module compatibility tests; older engines are not necessarily in the provider's own supported test matrix.
 
 ## Before upgrading
 
-Back up the consuming root configuration's state and commit its dependency lock file.
-Update the module version and run `terraform init -upgrade` (or `tofu init -upgrade`).
-Review the plan before applying it. Child module lock files do not constrain the consuming root configuration.
-
-Document changes to minimum engine/provider versions, input types and defaults, outputs,
-resource addresses, and map keys. Use a major release for incompatible changes.
-Provide `moved` blocks or explicit migration instructions when resource addresses change.
-Unknown object properties may be discarded by Terraform's object conversion; verify property
-names against the generated input documentation.
-
-Explain which changes can replace resources and how users should handle them.
-Preserve existing resource names and caller-supplied map keys where possible.
+Back up your root configuration's state and commit its dependency lock file. Update the module version,
+run `terraform init -upgrade` (or `tofu init -upgrade`), and review the plan before applying it.
+Child module lock files do not constrain a consuming root configuration.
+Keep caller-supplied map keys stable to retain resource addresses.
+Unknown object properties may be discarded by Terraform's object conversion; check input property names.
 
 ## Checks
 
-Run `terraform init -backend=false`, `terraform validate`, and `terraform test`,
-or the equivalent `tofu` commands. Initialize and validate examples, child modules,
-and test helpers separately. CI discovers these directories from tracked Terraform files.
-
-Native tests belong in `tests/*.tftest.hcl`; shared setup belongs in `tests/setup/main.tf`.
-Mock cloud providers to avoid creating infrastructure. Real local providers may be used to
-check rendering and transformations without cloud credentials.
-
-Before a production release, exercise creation, a second no-change plan, updates, and teardown
-in a disposable account or project. Mocks do not verify live API behavior, quotas, or capacity.
+Run `terraform init -backend=false`, `terraform validate`, and `terraform test` (or equivalent `tofu`
+commands). Initialize and validate each example and submodule separately. Tests use mock providers;
+no cloud credentials are needed and no real infrastructure is created.
+Before release, check creation, a second no-change plan, updates, and teardown in a disposable Hetzner
+project. Mocks do not verify live API behavior, quotas, or capacity.
 
 ## Provider coverage maintenance
 
-With the module initialized, run `formr schema . -o docs/SCHEMA.md` to generate the
-coverage report, then `formr check . --report docs/SCHEMA.md` to check for drift.
+Formr generates the [schema report](SCHEMA.md). With the module initialized,
+run `formr schema . -o docs/SCHEMA.md` and `formr check . --report docs/SCHEMA.md`.
 Use the same engine and provider selections recorded in the report's provenance.
-No `SCHEMA.md` is included in this boilerplate; generate it for each implemented module.
+The default policy checks inventory completeness and unresolved analysis. Strict interface coverage
+and exception annotations are not yet implemented, so a passing check does not approve omitted fields.
+Provider configuration belongs in the consuming root configuration; IDs and other computed attributes
+are provider-managed rather than creation inputs.
 
-Review provider-level settings and every resource/data-source property, including nested blocks,
-computed attributes, and outputs. Make supported configurable properties accessible through the
-module interface and document intentional omissions, fixed values, and Terraform lifecycle limitations.
-Keep provider credentials in the caller's provider configuration.
+Regenerate README inputs/outputs with `terraform-docs -c .github/linters/.terraform-docs.yml .`.
 
-The current default Formr policy checks inventory completeness and unresolved analysis.
-Strict interface coverage and exception annotations are not yet implemented, so a passing default
-check does not approve omitted fields. Review mappings and defaults alongside the generated report.
+## Primary IP lifecycle
 
-Regenerate README inputs and outputs with
-`terraform-docs -c .github/linters/.terraform-docs.yml .`.
+The resource map exports supported attributes, excluding the obsolete `datacenter` field. All supported resource inputs are exposed; the deprecated
+`datacenter` input is omitted because hcloud 1.70 rejects it. Use `location` instead.
+`auto_delete` defaults to false and `delete_protection` to true. The caller can override both per IP.
+A configured assignee ID defaults its assignee type to `server`; otherwise the type remains caller-specified
+or null. The provider enforces location/assignee exclusivity. Coordinate changes to existing server IPs
+with Hetzner's power-state and assignment constraints during live integration tests.
 
-## Module changes
-
-Replace this section for each release with concrete input/output changes, deprecations,
-provider behavior changes, and migration examples. Include compatibility tests for behavior
-that existing callers depend on.
+Formr currently marks `datacenter` as exported when tracing the resource collection through the output
+comprehension. The output explicitly selects supported fields and excludes `datacenter`; that report entry
+is a conservative dependency trace, not a declaration of the output object's fields.
